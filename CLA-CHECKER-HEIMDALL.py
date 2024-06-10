@@ -1,6 +1,6 @@
 # CLA-CHECKER-HEIMDALL
 # Version 0.1
-# Required libraries: requests google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client pandas
+# Required Python libraries: requests google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client pandas
 
 from datetime import datetime
 import subprocess
@@ -26,8 +26,8 @@ url = f"{MATRIX_SERVER_URL}/_matrix/client/r0/rooms/{ROOM_ID}/send/m.room.messag
 SERVICE_ACCOUNT_FILE = 'cla-checker-heimdall.json'
 
 # The ID and sheet range for CLA Sheet
-SPREADSHEET_ID = '1hhnr16H2uuaDvdKmHE6ZrHIVuDW-SRt9bZRYlgMAsoI'
-RANGE_NAME = 'Sheet1'
+SPREADSHEET_ID = '1bkp5Ed7wJTZvxHzAPj2pmkaSxAE2rW6_-aaadYG5o4I'
+RANGE_NAME = 'Revision 10'
 
 # Column name or index to extract (Use either one, not both)
 COLUMN_NAME = 'GitHub Username'  # Replace with your column name
@@ -39,6 +39,9 @@ credentials = service_account.Credentials.from_service_account_file(
     scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
 )
 
+# Characters to omit from extracted username
+CHARS_TO_OMIT = ['\\', '"', ',', '}']
+
 # Connect to Google Sheets API
 service = build('sheets', 'v4', credentials=credentials)
 sheet = service.spreadsheets()
@@ -49,7 +52,7 @@ result = sheet.values().get(spreadsheetId=SPREADSHEET_ID,
 values = result.get('values', [])
 
 if not values:
-    print('No CLA usernames found. Please check credentials.')
+    print('HEIMDALL: No CLA usernames found. Please check credentials.')
     # Set Heimdall bot message
     MESSAGE = (ts + " - HEIMDALL: CLA sync failed. @room")
 else:
@@ -60,22 +63,32 @@ else:
         # Extract the specific column
         if COLUMN_NAME:
             column_data = df[COLUMN_NAME]
+
         # elif COLUMN_INDEX is not None:
         #     column_data = df.iloc[:, COLUMN_INDEX]
         else:
-            print('Incorrect COLUMN_NAME or COLUMN_INDEX.')
+            print('HEIMDALL: Incorrect COLUMN_NAME or COLUMN_INDEX.')
             exit()
 
-        # Format for json
-        formatted_data = ' , '.join(f'"{item}"' for item in column_data)
+        # Function to remove escape characters
+        def remove_esc_chars(text):
+            for char in CHARS_TO_OMIT:
+                text = text.replace(char, '')
+            return text
+
+        # Filter out empty cells where no username was given
+        column_data = [item for item in column_data if item.strip()]
+
+        # Strip unwanted characters and format for json list
+        formatted_data = ' , '.join(f'"{remove_esc_chars(item)}"' for item in column_data if item.strip())
 
         # Save list to a local file
-        with open('cla_users.txt', 'w', encoding='utf-8') as file:
+        with open('cla_users', 'w', encoding='utf-8') as file:
             file.write(formatted_data)
 
         # Assign the formatted data to a string
         formatted_string = formatted_data
-        print('* Column data has been saved to cla_users.txt')
+        print('HEIMDALL: Column data has been saved to cla_users')
         #print(f'Formatted string: {formatted_string}')
 
         # Set Heimdall bot message
@@ -101,6 +114,6 @@ response = requests.post(url, json=bot_msg)
 
 # Check the bot message response
 if response.status_code == 200:
-    print("* Message sent successfully!")
+    print("HEIMDALL: Matrix message sent successfully!")
 else:
-    print(f"Failed to send message: {response.status_code} - {response.text}")
+    print(f"HEIMDALL: Failed to send Matrix message: {response.status_code} - {response.text}")
