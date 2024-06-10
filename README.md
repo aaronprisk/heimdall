@@ -6,4 +6,4 @@ To learn more about the Canonical CLA, please visit: https://ubuntu.com/legal/co
 ## Requirements
 The following Python libraries are required: 
 
-``` google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client pandas ```
+``` requests google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client pandas ```
