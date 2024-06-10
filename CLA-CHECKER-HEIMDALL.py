@@ -15,7 +15,7 @@ dt = datetime.now()
 ts = dt.strftime('%Y-%m-%d %H:%M:%S')
 
 # Heimdall Matrix bot data
-ACCESS_TOKEN = "INSERT-MATRIX-TOKEN-HERE"
+ACCESS_TOKEN = "MATRIX-TOKEN"
 ROOM_ID = "!sPlzDlGooZRMXzAVKw:ubuntu.com"
 
 # Matrix server URL and endpoint
