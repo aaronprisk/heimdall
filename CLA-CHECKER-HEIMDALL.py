@@ -23,7 +23,7 @@ MATRIX_SERVER_URL = "https://chat-server.ubuntu.com"
 url = f"{MATRIX_SERVER_URL}/_matrix/client/r0/rooms/{ROOM_ID}/send/m.room.message?access_token={ACCESS_TOKEN}"
 
 # Path to the Google project json
-SERVICE_ACCOUNT_FILE = 'cla-checker-heimdall.json'
+SERVICE_ACCOUNT_FILE = 'canonical-heimdall.json'
 
 # The ID and sheet range for CLA Sheet
 SPREADSHEET_ID = '1bkp5Ed7wJTZvxHzAPj2pmkaSxAE2rW6_-aaadYG5o4I'
