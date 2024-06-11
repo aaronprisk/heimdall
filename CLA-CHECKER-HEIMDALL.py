@@ -39,9 +39,6 @@ credentials = service_account.Credentials.from_service_account_file(
     scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
 )
 
-# Characters to omit from extracted username
-CHARS_TO_OMIT = ['\\', '"', ',', '}']
-
 # Connect to Google Sheets API
 service = build('sheets', 'v4', credentials=credentials)
 sheet = service.spreadsheets()
@@ -53,57 +50,78 @@ values = result.get('values', [])
 
 if not values:
     print('HEIMDALL: No CLA usernames found. Please check credentials.')
-    # Set Heimdall bot message
-    MESSAGE = (ts + " - HEIMDALL: CLA sync failed. @room")
+    MESSAGE = (ts + " - HEIMDALL: CLA sync failed. No CLA usernames found. Please check credentials. @room")
 else:
+    # Convert the values to a pandas DataFrame
     try:
-        # Convert the values to a Pandas DataFrame
         df = pd.DataFrame(values[1:], columns=values[0])
+    except Exception as e:
+        print(f"HEIMDALL: Unable to create dataframe: {e}")
+        MESSAGE = (ts + " - HEIMDALL: Unable to generate user list. Please check credentials. @room")
+        exit()
 
-        # Extract the specific column
-        if COLUMN_NAME:
-            column_data = df[COLUMN_NAME]
-
-        # elif COLUMN_INDEX is not None:
-        #     column_data = df.iloc[:, COLUMN_INDEX]
+    # Extract the Github username column
+    if COLUMN_NAME:
+        if COLUMN_NAME in df.columns:
+            column_data = df[COLUMN_NAME].dropna().astype(str).tolist()
         else:
-            print('HEIMDALL: Incorrect COLUMN_NAME or COLUMN_INDEX.')
+            print('HEIMDALL: No CLA usernames found. Please check credentials.')
+            MESSAGE = (ts + " - HEIMDALL: CLA sync failed. No CLA usernames found. Please check credentials. @room")
             exit()
+    # elif COLUMN_INDEX is not None:
+    #     column_data = df.iloc[:, COLUMN_INDEX].dropna().astype(str).tolist()
+    else:
+        print('HEIMDALL: Incorrect COLUMN_NAME or COLUMN_INDEX.')
+        MESSAGE = (ts + " - HEIMDALL: CLA sync failed. Incorrect COLUMN_NAME or COLUMN_INDEX. @room")
+        exit()
 
-        # Function to remove escape characters
-        def remove_esc_chars(text):
-            for char in CHARS_TO_OMIT:
-                text = text.replace(char, '')
-            return text
+    # Check for valid Github username
+    def is_valid_username(text):
+        return re.match(r'^[\w-]+$', text) is not None
 
-        # Filter out empty cells where no username was given
-        column_data = [item for item in column_data if item.strip()]
+    # Filter out empty cells and non valid usernames
+    try:
+        column_data = [item for item in column_data if item.strip() and is_valid_username(item.strip())]
+    except Exception as e:
+        print(f"HEIMDALL: Unable to filter usernames: {e}")
+        MESSAGE = (ts + " - HEIMDALL: CLA sync failed. Unable to filter usernames. @room")
+        exit()
 
-        # Strip unwanted characters and format for json list
-        formatted_data = ' , '.join(f'"{remove_esc_chars(item)}"' for item in column_data if item.strip())
+    # Check if there are at least 500 users in list
+    if len(column_data) < 500:
+        print('HEIMDALL: The sheet must contain at least 500 rows of data.')
+        MESSAGE = (ts + " - HEIMDALL: CLA sync failed. Invalid user count. @room")
+        exit()
 
-        # Save list to a local file
-        with open('cla_users', 'w', encoding='utf-8') as file:
-            file.write(formatted_data)
+    # Set user count to variable
+    user_count = len(column_data)
+    print(f"HEIMDALL: Total CLA signed users - {user_count}")
 
-        # Assign the formatted data to a string
-        formatted_string = formatted_data
-        print('HEIMDALL: Column data has been saved to cla_users')
-        #print(f'Formatted string: {formatted_string}')
+    # Format for json list
+    try:
+        formatted_data = ' , '.join(f'"{item}"' for item in column_data)
+    except Exception as e:
+        print(f"HEIMDALL: Unable to format user list: {e}")
+        MESSAGE = (ts + " - HEIMDALL: Unable to format user list. @room")
+        exit()
 
-        # Set Heimdall bot message
-        MESSAGE = (ts + " - HEIMDALL: CLA sync successful.")
+# Assign the formatted data to a string
+formatted_string = formatted_data
+print('HEIMDALL: Column data has been saved to cla_users')
+# print(f'Formatted string: {formatted_string}')
 
-        # Execute juju config command with exported usernames
-        command = ("""juju config charmed-cla-checker signed-cla-json='{"signed_cla": [""" + formatted_data + """]}'""")
-        # For debugging juju config command
-        # print(command)
-        try:
-            result = subprocess.run([command], shell=True, capture_output=True, text=True)
-        except:
-            MESSAGE = (ts + " - HEIMDALL: CLA sync failed. Could not execute juju config command. @room")
-    except:
-        MESSAGE = (ts + " - HEIMDALL: CLA sync failed. Check Google Sheet format or permissions. @room")
+# Set Heimdall bot message
+MESSAGE = (ts + " - HEIMDALL: CLA sync successful! - Total CLA users: " + str(user_count))
+
+# Execute juju config command with exported usernames
+command = ("""juju config charmed-cla-checker signed-cla-json='{"signed_cla": [""" + formatted_data + """]}'""")
+# For debugging juju config command
+# print(command)
+try:
+    result = subprocess.run([command], shell=True, capture_output=True, text=True)
+    print("HEIMDALL: CLA sync successfu!")
+except:
+    MESSAGE = (ts + " - HEIMDALL: CLA sync failed. Could not execute juju config command. @room")
 
 # Send the Heimdall bot message
 bot_msg = {
