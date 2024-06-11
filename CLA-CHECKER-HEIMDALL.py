@@ -80,9 +80,9 @@ else:
     def is_valid_username(text):
         return re.match(r'^[\w-]+$', text) is not None
 
-    # Filter out empty cells and non valid usernames
+    # Filter out empty cells, non valid and duplicate usernames
     try:
-        column_data = [item for item in column_data if item.strip() and is_valid_username(item.strip())]
+        column_data = list(set(item.strip() for item in column_data if item.strip() and is_valid_username(item.strip())))
     except Exception as e:
         print(f"HEIMDALL: Unable to filter usernames: {e}")
         MESSAGE = (ts + " - HEIMDALL: CLA sync failed. Unable to filter usernames. @room")
